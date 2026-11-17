@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Has Hands",
+  "version": "0.1.0",
+  "description": "Gives Claude Code full browser interaction capability within your real Chrome sessions",
+  "permissions": [
+    "nativeMessaging",
+    "activeTab",
+    "tabs",
+    "scripting",
+    "debugger",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

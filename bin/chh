@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# chh — cli-agnostic wrapper around the claude-has-hands REST bridge.
+#
+# This script lets Codex, Gemini, or any engine with a shell tool drive
+# the same browser_* surface that Claude Code reaches via MCP. It reads
+# bridge.json for the localhost URL and the token file, attaches a
+# Bearer header, and curls POST /v1/call.
+#
+# Usage:
+#   chh tools                                           # GET /v1/tools
+#   chh status                                          # GET /v1/status
+#   chh call <tool> ['<input-json>']                    # POST /v1/call
+#   chh <tool> ['<input-json>']                         # shorthand for `call`
+#
+# When this script is symlinked to a name that starts with `browser_`,
+# it dispatches that tool directly: `browser_navigate '{"url":"..."}'`.
+#
+# Environment overrides (matched by the MCP adapter so configs are
+# consistent across transports):
+#   CHH_BRIDGE_URL         override REST URL (default: read from bridge.json)
+#   CHH_BRIDGE_TOKEN_FILE  override token path (default: $HOME/.claude/claude-has-hands/bridge.token)
+#   CHH_BRIDGE_JSON        override bridge.json path (default: $HOME/.claude/claude-has-hands/bridge.json)
+
+set -euo pipefail
+
+DEFAULT_DIR="${HOME}/.claude/claude-has-hands"
+BRIDGE_JSON="${CHH_BRIDGE_JSON:-${DEFAULT_DIR}/bridge.json}"
+TOKEN_FILE="${CHH_BRIDGE_TOKEN_FILE:-${DEFAULT_DIR}/bridge.token}"
+
+err() {
+  printf 'chh: %s\n' "$*" >&2
+  exit 1
+}
+
+resolve_url() {
+  if [ -n "${CHH_BRIDGE_URL:-}" ]; then
+    printf '%s' "$CHH_BRIDGE_URL"
+    return 0
+  fi
+  if [ ! -r "$BRIDGE_JSON" ]; then
+    err "no bridge URL: set CHH_BRIDGE_URL, or run the native host so it writes ${BRIDGE_JSON}"
+  fi
+  # Pull "url" out of bridge.json without depending on jq — bridge.json
+  # is small, well-formed JSON, written by the native host.
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"])' "$BRIDGE_JSON" 2>/dev/null \
+    || err "could not parse url from ${BRIDGE_JSON}"
+}
+
+read_token() {
+  if [ ! -r "$TOKEN_FILE" ]; then
+    err "no readable token at ${TOKEN_FILE} (host not running?)"
+  fi
+  # tr -d removes the trailing newline if present
+  tr -d '\n' < "$TOKEN_FILE"
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    err "missing required command: $1"
+  fi
+}
+
+require_command curl
+require_command python3
+
+cmd_tools() {
+  local url token
+  url="$(resolve_url)"
+  token="$(read_token)"
+  curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/tools"
+  printf '\n'
+}
+
+cmd_status() {
+  local url token
+  url="$(resolve_url)"
+  token="$(read_token)"
+  curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/status"
+  printf '\n'
+}
+
+cmd_call() {
+  local tool="$1"; shift
+  local input="${1:-{\}}"
+  local url token
+
+  # Validate JSON input early so a typo doesn't get blamed on the host.
+  if ! printf '%s' "$input" | python3 -c 'import json,sys; json.loads(sys.stdin.read())' 2>/dev/null; then
+    err "input must be JSON; got: ${input}"
+  fi
+
+  url="$(resolve_url)"
+  token="$(read_token)"
+
+  # Build the envelope as JSON via python3 (so quoting can't cause a CLI
+  # injection from the input string).
+  local body
+  body="$(python3 -c '
+import json, sys
+tool = sys.argv[1]
+input_json = sys.argv[2]
+print(json.dumps({"tool": tool, "input": json.loads(input_json)}))
+' "$tool" "$input")"
+
+  curl -sS \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -d "$body" \
+    "${url}/v1/call"
+  printf '\n'
+}
+
+usage() {
+  cat <<USAGE
+Usage:
+  chh tools
+  chh status
+  chh call <tool> ['<input-json>']
+  chh <tool> ['<input-json>']            # shorthand for call
+
+Examples:
+  chh status
+  chh call browser_navigate '{"url":"https://example.com"}'
+  chh browser_survey '{}'
+
+Environment:
+  CHH_BRIDGE_URL          override REST URL
+  CHH_BRIDGE_TOKEN_FILE   override token path
+  CHH_BRIDGE_JSON         override bridge.json path
+USAGE
+}
+
+# When invoked as a per-tool symlink (basename starting with browser_),
+# treat argv as `call <basename> <json>`.
+self="$(basename "$0")"
+if [[ "$self" == browser_* ]]; then
+  cmd_call "$self" "${1:-{\}}"
+  exit 0
+fi
+
+if [ $# -eq 0 ]; then
+  usage
+  exit 0
+fi
+
+cmd="$1"; shift
+case "$cmd" in
+  tools)  cmd_tools ;;
+  status) cmd_status ;;
+  call)
+    if [ $# -lt 1 ]; then err "call needs a tool name"; fi
+    tool="$1"; shift
+    cmd_call "$tool" "${1:-{\}}"
+    ;;
+  -h|--help|help) usage ;;
+  browser_*)
+    cmd_call "$cmd" "${1:-{\}}"
+    ;;
+  *)
+    err "unknown command: ${cmd} (try: tools | status | call | help)"
+    ;;
+esac

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Has Hands — Test Fixture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1a1a2e;
+      background: #f8f9fa;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #444; }
+    h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: #666; }
+
+    .section {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Status Bar ─────────────────────────────────────────── */
+    #status-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #16213e;
+      color: #0ff;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    button, .btn {
+      padding: 0.4rem 0.9rem;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      background: #e9ecef;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin: 0.25rem;
+    }
+    button:hover { background: #dee2e6; }
+
+    .btn-primary { background: #4361ee; color: #fff; border-color: #4361ee; }
+    .btn-danger  { background: #e63946; color: #fff; border-color: #e63946; }
+
+    /* ── Forms ──────────────────────────────────────────────── */
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; font-weight: 600; }
+    input, select, textarea {
+      display: block;
+      width: 100%;
+      max-width: 320px;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
+    input[type="checkbox"] { display: inline; width: auto; margin-right: 0.4rem; }
+
+    .form-row { margin-bottom: 0.75rem; }
+
+    /* ── Links ──────────────────────────────────────────────── */
+    a { color: #4361ee; }
+
+    /* ── Scrollable container ───────────────────────────────── */
+    #scroll-container {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 2px solid #ccc;
+      border-radius: 4px;
+      padding: 0.75rem;
+      background: #fafafa;
+    }
+    #scroll-container p { margin-bottom: 0.5rem; }
+
+    /* ── Dynamic content ───────────────────────────────────── */
+    #dynamic-zone {
+      min-height: 60px;
+      border: 2px dashed #aaa;
+      border-radius: 4px;
+      padding: 0.75rem;
+      background: #f0f0ff;
+    }
+    .dynamic-item {
+      display: inline-block;
+      background: #4361ee;
+      color: #fff;
+      padding: 0.3rem 0.7rem;
+      border-radius: 3px;
+      margin: 0.2rem;
+      font-size: 0.8rem;
+    }
+
+    /* ── Iframe ─────────────────────────────────────────────── */
+    iframe {
+      width: 100%;
+      height: 280px;
+      border: 2px solid #e63946;
+      border-radius: 4px;
+    }
+
+    /* ── ARIA combobox (Radix-style) ─────────────────────── */
+    .aria-combobox {
+      display: inline-block;
+      position: relative;
+      max-width: 320px;
+      width: 100%;
+    }
+    .aria-combobox button.combo-trigger {
+      width: 100%;
+      text-align: left;
+      padding: 0.45rem 0.7rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin: 0;
+    }
+    .aria-combobox button.combo-trigger:focus { outline: 2px solid #4361ee; outline-offset: 1px; }
+    /* The listbox is rendered via a portal — see #portal-root and JS below. */
+    #portal-root [role="listbox"] {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      list-style: none;
+      padding: 0.25rem 0;
+      margin: 0;
+      max-height: 180px;
+      overflow-y: auto;
+      z-index: 1000;
+      min-width: 220px;
+    }
+    #portal-root [role="option"] {
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    #portal-root [role="option"][aria-selected="true"] { background: #e7efff; }
+    #portal-root [role="option"]:hover { background: #f3f6ff; }
+
+    /* ── File input ─────────────────────────────────────────── */
+    input[type="file"] { padding: 0.3rem; }
+
+    /* ── Grid helpers ───────────────────────────────────────── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ── Navigation test page links ─────────────────────────── */
+    .nav-links a {
+      display: inline-block;
+      margin-right: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Status bar: shows last interaction -->
+  <div id="status-bar">Last action: none</div>
+
+  <h1>Claude Has Hands — Test Fixture</h1>
+  <h2>Every interactive element type in one page</h2>
+
+  <div class="grid-2">
+
+    <!-- ── Buttons ────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Buttons</h3>
+      <button id="btn-primary" class="btn-primary" onclick="logAction('Clicked: Primary Action')">Primary Action</button>
+      <button id="btn-secondary" onclick="logAction('Clicked: Secondary Action')">Secondary Action</button>
+      <button id="btn-submit-1" onclick="logAction('Clicked: Submit (first)')">Submit</button>
+      <button id="btn-submit-2" onclick="logAction('Clicked: Submit (second)')">Submit</button>
+      <button id="btn-disabled" disabled>Disabled Button</button>
+      <button id="btn-counter" onclick="incrementCounter()">Click Count: 0</button>
+    </div>
+
+    <!-- ── Navigation Links ──────────────────────────────── -->
+    <div class="section">
+      <h3>Navigation</h3>
+      <div class="nav-links">
+        <a href="#section-forms" id="link-forms">Jump to Forms</a>
+        <a href="#section-scroll" id="link-scroll">Jump to Scroll</a>
+        <a href="fixture-page2.html" id="link-page2">Go to Page 2</a>
+        <a href="https://example.com" id="link-external" target="_blank" rel="noopener">External Link</a>
+      </div>
+      <p style="margin-top:0.5rem; font-size:0.8rem; color:#888;">Anchor links test back/forward; Page 2 tests navigation.</p>
+    </div>
+
+    <!-- ── Text Inputs ───────────────────────────────────── -->
+    <div class="section" id="section-forms">
+      <h3>Login Form</h3>
+      <form id="login-form" onsubmit="return handleLogin(event)">
+        <div class="form-row">
+          <label for="input-email">Email</label>
+          <input type="email" id="input-email" name="email" placeholder="user@example.com" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label for="input-password">Password</label>
+          <input type="password" id="input-password" name="password" placeholder="Enter password" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <label><input type="checkbox" id="check-remember" name="remember"> Remember me</label>
+        </div>
+        <button type="submit" class="btn-primary">Log In</button>
+      </form>
+    </div>
+
+    <!-- ── Search + Textarea ─────────────────────────────── -->
+    <div class="section">
+      <h3>Search &amp; Notes</h3>
+      <form id="search-form" onsubmit="return handleSearch(event)">
+        <div class="form-row">
+          <label for="input-search">Search</label>
+          <input type="text" id="input-search" name="search" placeholder="Search...">
+        </div>
+        <button type="submit">Search</button>
+      </form>
+      <div class="form-row" style="margin-top:0.75rem">
+        <label for="textarea-notes">Notes</label>
+        <textarea id="textarea-notes" rows="3" placeholder="Type notes here..."></textarea>
+      </div>
+    </div>
+
+    <!-- ── Dropdowns + Checkboxes ────────────────────────── -->
+    <div class="section">
+      <h3>Dropdowns &amp; Choices</h3>
+      <div class="form-row">
+        <label for="select-color">Favourite Colour</label>
+        <select id="select-color" onchange="logAction('Selected colour: ' + this.value)">
+          <option value="">Choose...</option>
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="blue">Blue</option>
+          <option value="purple">Purple</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="select-project">Project (controlled)</label>
+        <select id="select-project">
+          <option value="">Choose project...</option>
+          <option value="project-a">Project A</option>
+          <option value="project-b">Project B</option>
+          <option value="project-c">Project C</option>
+          <option value="project-d">Project D</option>
+        </select>
+        <p style="font-size:0.75rem; color:#888; margin-top:-0.25rem;">
+          Selected project: <span id="selected-project">(none)</span>
+        </p>
+      </div>
+      <div class="form-row">
+        <label for="select-multi">Multi-select</label>
+        <select id="select-multi" multiple size="3" onchange="logSelectedMulti(this)">
+          <option value="a">Option A</option>
+          <option value="b">Option B</option>
+          <option value="c">Option C</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label><input type="checkbox" id="check-terms" onchange="logAction('Terms: ' + this.checked)"> I agree to the terms</label>
+      </div>
+      <div class="form-row">
+        <label><input type="checkbox" id="check-newsletter" onchange="logAction('Newsletter: ' + this.checked)"> Subscribe to newsletter</label>
+      </div>
+    </div>
+
+    <!-- ── ARIA Combobox + File Input ────────────────────── -->
+    <div class="section">
+      <h3>ARIA Combobox &amp; File Upload</h3>
+      <div class="form-row">
+        <label for="combo-mode-trigger">Mode (ARIA combobox, portal-rendered)</label>
+        <div class="aria-combobox" id="combo-mode">
+          <button
+            id="combo-mode-trigger"
+            type="button"
+            class="combo-trigger"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="combo-mode-listbox"
+            aria-labelledby="combo-mode-label"
+          >
+            <span id="combo-mode-label">Select a mode...</span>
+          </button>
+        </div>
+        <p style="font-size:0.75rem; color:#888; margin-top:0.25rem;">
+          Selected mode: <span id="selected-mode">(none)</span>
+        </p>
+      </div>
+
+      <div class="form-row">
+        <label for="file-upload">Upload file</label>
+        <input type="file" id="file-upload" onchange="logFileUpload(this)">
+        <p style="font-size:0.75rem; color:#888;">
+          Selected file: <span id="selected-file">(none)</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- ── Dynamic Content ───────────────────────────────── -->
+    <div class="section">
+      <h3>Dynamic Content (test observe)</h3>
+      <button id="btn-add-item" onclick="addDynamicItem()">Add Item</button>
+      <button id="btn-remove-item" onclick="removeDynamicItem()">Remove Item</button>
+      <button id="btn-clear-items" class="btn-danger" onclick="clearDynamicItems()">Clear All</button>
+      <div id="dynamic-zone" style="margin-top:0.5rem">
+        <span class="dynamic-item" data-index="0">Item 0</span>
+      </div>
+      <p style="font-size:0.75rem; color:#888; margin-top:0.25rem;">Dynamic item count: <span id="dynamic-count">1</span></p>
+    </div>
+  </div>
+
+  <!-- ── Scrollable Container ──────────────────────────── -->
+  <div class="section" id="section-scroll">
+    <h3>Scrollable Container</h3>
+    <div id="scroll-container">
+      <p>Paragraph 1: The quick brown fox jumps over the lazy dog.</p>
+      <p>Paragraph 2: Pack my box with five dozen liquor jugs.</p>
+      <p>Paragraph 3: How vexingly quick daft zebras jump.</p>
+      <p>Paragraph 4: The five boxing wizards jump quickly.</p>
+      <p>Paragraph 5: Sphinx of black quartz, judge my vow.</p>
+      <p>Paragraph 6: Two driven jocks help fax my big quiz.</p>
+      <p>Paragraph 7: The quick brown fox jumps over the lazy dog again.</p>
+      <p>Paragraph 8: Bright vixens jump; dozy fowl quack.</p>
+      <p>Paragraph 9: Quick zephyrs blow, vexing daft Jim.</p>
+      <p>Paragraph 10: How quickly daft jumping zebras vex.</p>
+      <p>Paragraph 11: Jackdaws love my big sphinx of quartz.</p>
+      <p>Paragraph 12: The five boxing wizards jump quickly at noon.</p>
+      <p>Paragraph 13: Mr Jock, TV quiz PhD, bags few lynx.</p>
+      <p>Paragraph 14: Cwm fjord veg balks nth pyx quiz.</p>
+      <p>Paragraph 15: Vex quest, Jack? My big dwarf zephyr.</p>
+      <p>Paragraph 16: How razorback-jumping frogs can level six piqued gymnasts!</p>
+      <p>Paragraph 17: Cozy lummox gives smart squid who asks for job pen.</p>
+      <p>Paragraph 18: Amazingly few discotheques provide jukeboxes.</p>
+      <p>Paragraph 19: Few quips galvanized the mock jury box.</p>
+      <p>Paragraph 20: The end of the scrollable content.</p>
+    </div>
+  </div>
+
+  <!-- ── Iframe: Payment Form ────────────────────────────── -->
+  <div class="section">
+    <h3>Embedded Payment Form (iframe)</h3>
+    <iframe id="payment-iframe" src="iframe-fixture.html" title="Payment Form"></iframe>
+  </div>
+
+  <!-- ── Hidden / aria elements for survey testing ─────── -->
+  <div class="section">
+    <h3>Accessibility Test</h3>
+    <div role="alert" id="alert-box" style="display:none; background:#fff3cd; padding:0.5rem; border-radius:4px;">Alert message will appear here.</div>
+    <button id="btn-show-alert" onclick="showAlert()">Show Alert</button>
+    <button id="btn-hide-alert" onclick="hideAlert()">Hide Alert</button>
+    <div role="status" aria-live="polite" id="live-region">Waiting for action...</div>
+  </div>
+
+  <!-- ── Second page link for navigation testing ─────────── -->
+  <div class="section">
+    <h3>Read Test</h3>
+    <div id="read-target">
+      <p>This is a <strong>read target</strong> block. It contains <em>formatted text</em>,
+      a <a href="#">link inside text</a>, and a <code>code snippet</code>.</p>
+      <ul>
+        <li>List item one</li>
+        <li>List item two</li>
+        <li>List item three</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── Lots of content to make page scrollable ───────── -->
+  <div class="section">
+    <h3>Page Scroll Padding</h3>
+    <p>This section exists to ensure the overall page is scrollable for testing browser_scroll on the page itself.</p>
+    <div style="height: 600px; background: linear-gradient(to bottom, #f8f9fa, #dee2e6); border-radius: 4px; display:flex; align-items:center; justify-content:center; color:#888;">
+      600px tall spacer for scroll testing
+    </div>
+  </div>
+
+  <footer style="text-align:center; color:#999; font-size:0.75rem; padding:1rem 0;">
+    claude-has-hands test fixture — not a real application
+  </footer>
+
+  <!-- Portal root for ARIA combobox listbox. Lives outside the form on purpose
+       so it mirrors the way Radix/Headless UI render their popovers. -->
+  <div id="portal-root"></div>
+
+<script>
+  // ── Status logging ─────────────────────────────────────
+  function logAction(msg) {
+    document.getElementById('status-bar').textContent = 'Last action: ' + msg;
+    document.getElementById('live-region').textContent = msg;
+  }
+
+  // ── Counter ────────────────────────────────────────────
+  let clickCount = 0;
+  function incrementCounter() {
+    clickCount++;
+    const btn = document.getElementById('btn-counter');
+    btn.textContent = 'Click Count: ' + clickCount;
+    logAction('Counter incremented to ' + clickCount);
+  }
+
+  // ── Dynamic content ────────────────────────────────────
+  let dynamicIndex = 1;
+  function addDynamicItem() {
+    const zone = document.getElementById('dynamic-zone');
+    const span = document.createElement('span');
+    span.className = 'dynamic-item';
+    span.dataset.index = dynamicIndex;
+    span.textContent = 'Item ' + dynamicIndex;
+    zone.appendChild(span);
+    dynamicIndex++;
+    updateDynamicCount();
+    logAction('Added dynamic item ' + (dynamicIndex - 1));
+  }
+
+  function removeDynamicItem() {
+    const zone = document.getElementById('dynamic-zone');
+    const items = zone.querySelectorAll('.dynamic-item');
+    if (items.length > 0) {
+      const last = items[items.length - 1];
+      last.remove();
+      updateDynamicCount();
+      logAction('Removed last dynamic item');
+    }
+  }
+
+  function clearDynamicItems() {
+    const zone = document.getElementById('dynamic-zone');
+    zone.innerHTML = '';
+    updateDynamicCount();
+    logAction('Cleared all dynamic items');
+  }
+
+  function updateDynamicCount() {
+    const zone = document.getElementById('dynamic-zone');
+    document.getElementById('dynamic-count').textContent = zone.querySelectorAll('.dynamic-item').length;
+  }
+
+  // ── Form handlers ──────────────────────────────────────
+  function handleLogin(event) {
+    event.preventDefault();
+    const email = document.getElementById('input-email').value;
+    const password = document.getElementById('input-password').value;
+    const remember = document.getElementById('check-remember').checked;
+    logAction('Login submitted: email=' + email + ', remember=' + remember);
+    return false;
+  }
+
+  function handleSearch(event) {
+    event.preventDefault();
+    const query = document.getElementById('input-search').value;
+    logAction('Search submitted: "' + query + '"');
+    return false;
+  }
+
+  // ── Track project + multi-select changes ───────────────
+  document.getElementById('select-project').addEventListener('change', function (e) {
+    var v = e.target.value;
+    document.getElementById('selected-project').textContent = v || '(none)';
+    logAction('Selected project: ' + v);
+  });
+
+  function logSelectedMulti(sel) {
+    var picks = Array.from(sel.selectedOptions).map(function (o) { return o.value; });
+    logAction('Multi-select: ' + JSON.stringify(picks));
+  }
+
+  function logFileUpload(input) {
+    var f = input.files && input.files[0];
+    var name = f ? (f.name + ' (' + f.size + ' bytes)') : '(none)';
+    document.getElementById('selected-file').textContent = name;
+    logAction('File chosen: ' + name);
+  }
+
+  // ── ARIA combobox (Radix-style, portal-rendered) ───────
+  // The trigger is in the form; the listbox is rendered into #portal-root
+  // when opened. This mirrors how Radix and Headless UI ship their selects.
+  var MODE_OPTIONS = [
+    { value: 'sf-dry', label: 'SF Dry — Real call, no Salesforce write' },
+    { value: 'sf-live', label: 'SF Live — Real call + write to Salesforce' },
+    { value: 'log-only', label: 'Log only — Mark done, never dial' },
+  ];
+
+  var modeListboxEl = null;
+
+  function openModeListbox() {
+    closeModeListbox();
+    var trigger = document.getElementById('combo-mode-trigger');
+    var rect = trigger.getBoundingClientRect();
+    var ul = document.createElement('ul');
+    ul.id = 'combo-mode-listbox';
+    ul.setAttribute('role', 'listbox');
+    ul.style.left = (rect.left + window.scrollX) + 'px';
+    ul.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    ul.style.minWidth = rect.width + 'px';
+
+    MODE_OPTIONS.forEach(function (opt, i) {
+      var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.setAttribute('data-value', opt.value);
+      li.setAttribute('aria-selected', 'false');
+      li.textContent = opt.label;
+      li.addEventListener('click', function () {
+        chooseMode(opt);
+      });
+      ul.appendChild(li);
+    });
+
+    document.getElementById('portal-root').appendChild(ul);
+    trigger.setAttribute('aria-expanded', 'true');
+    modeListboxEl = ul;
+  }
+
+  function closeModeListbox() {
+    if (modeListboxEl) {
+      modeListboxEl.remove();
+      modeListboxEl = null;
+    }
+    document.getElementById('combo-mode-trigger').setAttribute('aria-expanded', 'false');
+  }
+
+  function chooseMode(opt) {
+    document.getElementById('combo-mode-label').textContent = opt.label;
+    document.getElementById('selected-mode').textContent = opt.value;
+    closeModeListbox();
+    logAction('Selected mode: ' + opt.value);
+  }
+
+  document.getElementById('combo-mode-trigger').addEventListener('click', function () {
+    var expanded = this.getAttribute('aria-expanded') === 'true';
+    if (expanded) closeModeListbox(); else openModeListbox();
+  });
+
+  // Close on outside click — but ignore clicks inside the listbox itself.
+  document.addEventListener('click', function (e) {
+    if (!modeListboxEl) return;
+    var trig = document.getElementById('combo-mode-trigger');
+    if (trig.contains(e.target) || modeListboxEl.contains(e.target)) return;
+    closeModeListbox();
+  }, true);
+
+  // ── Alert ──────────────────────────────────────────────
+  function showAlert() {
+    const box = document.getElementById('alert-box');
+    box.style.display = 'block';
+    box.textContent = 'This is an alert message! Timestamp: ' + new Date().toISOString();
+    logAction('Alert shown');
+  }
+
+  function hideAlert() {
+    document.getElementById('alert-box').style.display = 'none';
+    logAction('Alert hidden');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,17 @@
+node_modules/
+extension/dist/
+native-host/dist/
+*.js.map
+.DS_Store
+.claude/
+.mcp-config.json
+/pnpm-lock.yaml
+/yarn.lock
+.worktrees/
+.env
+.env.*
+*.token
+bridge.json
+.forge/
+.test-artifacts/
+test-plan.md
