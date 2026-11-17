@@ -234,18 +234,10 @@ async function startStdio(server: McpServer): Promise<void> {
 }
 
 async function startHttp(
-  server: McpServer,
+  makeServer: () => McpServer,
   port: number,
   tokenPath: string = process.env.CHH_BRIDGE_TOKEN_FILE ?? DEFAULT_TOKEN_PATH
 ): Promise<http.Server> {
-  // One stateless transport handles every request — adequate for local
-  // single-user use; if we later want multi-session, we would generate
-  // a session id per `initialize` and route subsequent requests by it.
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless mode
-  });
-  await server.connect(transport);
-
   const httpServer = http.createServer((req, res) => {
     // Same Origin allowlist and bearer check as the REST server. The token is
     // re-read per request because the host rotates it on every restart.
@@ -268,20 +260,31 @@ async function startHttp(
       res.end();
       return;
     }
-    transport.handleRequest(req, res).catch((err) => {
-      log(`MCP HTTP error: ${err}`);
-      if (!res.headersSent) {
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: { code: -32603, message: String(err) },
-            id: null,
-          })
-        );
-      }
+    // The SDK refuses to reuse a stateless transport, so each request gets
+    // its own server and transport, closed when the response ends.
+    const server = makeServer();
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on("close", () => {
+      void transport.close();
+      void server.close();
     });
+    server
+      .connect(transport)
+      .then(() => transport.handleRequest(req, res))
+      .catch((err) => {
+        log(`MCP HTTP error: ${err}`);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: { code: -32603, message: String(err) },
+              id: null,
+            })
+          );
+        }
+      });
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -315,10 +318,7 @@ async function main(): Promise<void> {
   if (useHttp) {
     const port = httpPortEnv ? Number.parseInt(httpPortEnv, 10) : 0;
     if (Number.isNaN(port)) throw new Error(`Invalid CHH_MCP_HTTP_PORT=${httpPortEnv}`);
-    // The HTTP transport requires its own server instance; connecting two
-    // transports to one McpServer is not supported by the SDK.
-    const httpServer = buildMcpServer();
-    await startHttp(httpServer, port);
+    await startHttp(buildMcpServer, port);
   }
 }
 
