@@ -24,43 +24,10 @@ mkdir -p "$DEST_DIR"
 ln -sf "$SRC" "$DEST_DIR/chh"
 echo "linked: $DEST_DIR/chh -> $SRC"
 
-# Per-tool symlinks. The tool list is generated dynamically from the
-# REST surface so it stays in lockstep with BrowserToolRegistry — but
-# requires the host to be running. If it isn't, fall back to a static
-# hard-coded list (kept in sync with native-host/src/tool-registry.ts).
-TOOLS=""
-DEFAULT_BRIDGE_JSON="${CHH_BRIDGE_JSON:-$HOME/.claude/claude-has-hands/bridge.json}"
-DEFAULT_TOKEN_FILE="${CHH_BRIDGE_TOKEN_FILE:-$HOME/.claude/claude-has-hands/bridge.token}"
-
-if [ -r "$DEFAULT_BRIDGE_JSON" ] && [ -r "$DEFAULT_TOKEN_FILE" ] && command -v curl >/dev/null && command -v python3 >/dev/null; then
-  URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["url"])' "$DEFAULT_BRIDGE_JSON" 2>/dev/null || true)"
-  TOKEN="$(tr -d '\n' < "$DEFAULT_TOKEN_FILE")"
-  if [ -n "$URL" ] && [ -n "$TOKEN" ]; then
-    TOOLS="$(curl -sS -H "Authorization: Bearer ${TOKEN}" "${URL}/v1/tools" 2>/dev/null \
-      | python3 -c 'import json,sys
-try:
-  data = json.load(sys.stdin)
-  for t in data.get("tools", []): print(t["name"])
-except Exception:
-  pass' || true)"
-  fi
-fi
-
+TOOLS="$(cd "$PROJECT_ROOT" && node -e 'import("./native-host/src/tool-registry.ts").then((m) => { for (const t of m.BROWSER_TOOLS) console.log(t.name); })')"
 if [ -z "$TOOLS" ]; then
-  TOOLS="browser_status
-browser_navigate
-browser_back
-browser_forward
-browser_survey
-browser_click
-browser_type
-browser_read
-browser_scroll
-browser_keypress
-browser_screenshot
-browser_observe
-browser_tabs
-browser_wait"
+  echo "ERROR: could not read tool names from native-host/src/tool-registry.ts (needs Node 22.18 or later and npm ci)" >&2
+  exit 1
 fi
 
 while IFS= read -r tool; do

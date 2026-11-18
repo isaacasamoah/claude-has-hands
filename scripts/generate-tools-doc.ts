@@ -22,7 +22,7 @@ function params(schema: JsonSchemaObject): string {
 export function renderToolsDoc(): string {
   const rows = listToolDescriptors().map(
     (t) =>
-      `| \`${t.name}\` | ${firstSentence(t.description).replace(/\|/g, "\\|")} | ${params(t.inputSchema as JsonSchemaObject)} |`
+      `| \`${t.name}\` | ${firstSentence(t.description).replace(/\|/g, "\\|").replace(/<(\w+)>/g, "`<$1>`")} | ${params(t.inputSchema as JsonSchemaObject)} |`
   );
   return [
     "# Tool reference",
