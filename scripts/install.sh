@@ -12,13 +12,12 @@ echo ""
 # Check node is available
 if ! command -v node &>/dev/null; then
   echo "ERROR: node is not installed or not in PATH."
-  echo "Install Node.js 22.18 or later from https://nodejs.org"
+  echo "Install Node.js from https://nodejs.org"
   exit 1
 fi
 
-# package.json requires 22.18 because the unit tests and docs:tools run TypeScript natively.
-if ! node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 18) ? 0 : 1)'; then
-  echo "ERROR: Node.js 22.18 or later is required (found $(node -v))."
+if ! node -e 'const min = require(process.argv[1]).engines.node.replace(">=", "").split(".").map(Number); const cur = process.versions.node.split(".").map(Number); process.exit(cur[0] > min[0] || (cur[0] === min[0] && cur[1] >= min[1]) ? 0 : 1)' "$PROJECT_ROOT/package.json"; then
+  echo "ERROR: Node.js $(node -p "require(process.argv[1]).engines.node" "$PROJECT_ROOT/package.json") is required (found $(node -v))."
   echo "Install a newer version from https://nodejs.org"
   exit 1
 fi

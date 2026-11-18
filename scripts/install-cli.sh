@@ -24,11 +24,9 @@ mkdir -p "$DEST_DIR"
 ln -sf "$SRC" "$DEST_DIR/chh"
 echo "linked: $DEST_DIR/chh -> $SRC"
 
-# Per-tool symlinks. docs/tools.md is generated from the tool registry and a
-# unit test keeps it in sync, so it lists every tool without a running host.
-TOOLS="$(grep -oE '^\| `browser_[a-z_]+`' "$PROJECT_ROOT/docs/tools.md" | tr -d '|` ')"
+TOOLS="$(cd "$PROJECT_ROOT" && node -e 'import("./native-host/src/tool-registry.ts").then((m) => { for (const t of m.BROWSER_TOOLS) console.log(t.name); })')"
 if [ -z "$TOOLS" ]; then
-  echo "ERROR: no tools found in $PROJECT_ROOT/docs/tools.md" >&2
+  echo "ERROR: could not read tool names from native-host/src/tool-registry.ts (needs Node 22.18 or later and npm ci)" >&2
   exit 1
 fi
 
