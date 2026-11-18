@@ -12,14 +12,13 @@ echo ""
 # Check node is available
 if ! command -v node &>/dev/null; then
   echo "ERROR: node is not installed or not in PATH."
-  echo "Install Node.js 18+ from https://nodejs.org"
+  echo "Install Node.js 22.18 or later from https://nodejs.org"
   exit 1
 fi
 
-# Check node version (require 18+)
-NODE_VERSION=$(node -e "console.log(process.versions.node.split('.')[0])")
-if [ "$NODE_VERSION" -lt 18 ]; then
-  echo "ERROR: Node.js 18+ is required (found v$(node -v))."
+# package.json requires 22.18 because the unit tests and docs:tools run TypeScript natively.
+if ! node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 18) ? 0 : 1)'; then
+  echo "ERROR: Node.js 22.18 or later is required (found $(node -v))."
   echo "Install a newer version from https://nodejs.org"
   exit 1
 fi
@@ -127,24 +126,6 @@ SOCKET_DIR="$HOME/.claude/claude-has-hands"
 mkdir -p "$SOCKET_DIR"
 echo "Socket directory created: $SOCKET_DIR"
 
-# ── MCP Server Config Snippet ─────────────────────────────────────
-
-MCP_CONFIG=$(cat <<JSONEOF
-{
-  "mcpServers": {
-    "browser": {
-      "command": "node",
-      "args": ["$NATIVE_HOST_DIR/dist/mcp-server.js"]
-    }
-  }
-}
-JSONEOF
-)
-
-# Write snippet to a file for easy copy
-MCP_CONFIG_FILE="$PROJECT_ROOT/.mcp-config.json"
-echo "$MCP_CONFIG" > "$MCP_CONFIG_FILE"
-
 # ── Summary ────────────────────────────────────────────────────────
 
 echo ""
@@ -155,16 +136,10 @@ echo "║                                                              ║"
 echo "║  Built:                                                      ║"
 echo "║    Extension  → extension/dist/background.js                 ║"
 echo "║    Native Host → native-host/dist/index.js                   ║"
-echo "║    MCP Server  → native-host/dist/mcp-server.js              ║"
+echo "║    MCP Adapter → native-host/dist/mcp-adapter.js             ║"
 echo "║                                                              ║"
 echo "║  Native Messaging:                                           ║"
 echo "║    $MANIFEST_FILE"
-echo "║                                                              ║"
-echo "║  MCP Config (copy to settings):                              ║"
-echo "║    $MCP_CONFIG_FILE"
-echo "║                                                              ║"
-echo "║  Test Fixture:                                               ║"
-echo "║    file://$PROJECT_ROOT/test/fixture.html"
 echo "║                                                              ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
@@ -186,15 +161,15 @@ if [ "$EXT_ID" = "PLACEHOLDER" ]; then
   echo ""
 else
   echo "NEXT STEPS:"
-  echo "  1. Add MCP config to Claude Code settings:"
-  echo "     cat $MCP_CONFIG_FILE"
-  echo ""
-  echo "  2. Reload extension if already loaded:"
+  echo "  1. Reload the extension so Chrome starts the native host:"
   echo "     chrome://extensions → click reload on Claude Has Hands"
   echo "     (Chrome binary: $CHROME_BIN)"
   echo ""
-  echo "  3. Test with: open chrome and navigate to the test fixture"
-  echo "     file://$PROJECT_ROOT/test/fixture.html"
+  echo "  2. Check the round trip to the extension:"
+  echo "     $PROJECT_ROOT/bin/chh call browser_status"
+  echo ""
+  echo "  3. Add the MCP adapter to your agent, for example:"
+  echo "     claude mcp add -s user claude-has-hands -- node $NATIVE_HOST_DIR/dist/mcp-adapter.js"
   echo ""
 fi
 
