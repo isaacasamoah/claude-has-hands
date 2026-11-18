@@ -18,7 +18,7 @@ A trailing `?` marks an optional parameter. `GET /v1/tools` or `chh tools` retur
 | `browser_scroll` | Scroll the page or a specific scrollable element. | `direction`, `amount?`, `selector?` |
 | `browser_keypress` | Dispatch a keyboard event (keydown, keypress, keyup) to the page or a specific element. | `key`, `selector?`, `modifiers?` |
 | `browser_screenshot` | Capture a screenshot of the current page as a JPEG image. | `quality?` |
-| `browser_observe` | Start or stop a DOM/navigation observer on the current page. | `action`, `observeId`, `events?` |
+| `browser_observe` | Start or stop a DOM and navigation observer on the current page. | `action`, `observeId`, `events?` |
 | `browser_tabs` | Manage browser tabs: list all tabs, switch to a tab, open a new tab, or close a tab. | `action`, `tabId?`, `url?` |
 | `browser_wait` | Wait for a condition: page navigation to complete, a CSS selector to appear, or a fixed timeout. | `condition`, `selector?`, `timeout?` |
 | `browser_console` | Read buffered console output (log/info/warn/error/debug) plus uncaught errors and unhandled promise rejections from the current page. | `level?`, `limit?`, `clear?` |
@@ -26,5 +26,5 @@ A trailing `?` marks an optional parameter. `GET /v1/tools` or `chh tools` retur
 | `browser_eval` | Evaluate a JavaScript expression in the page's main world and return its value. | `expression`, `awaitPromise?` |
 | `browser_file_upload` | Attach local files to a file <input> on the page, targeted by CSS selector. | `selector`, `files` |
 | `browser_form_input` | Fill multiple form fields in one call, targeting each by CSS selector. | `fields` |
-| `browser_gif` | Capture a timed sequence of frames (screenshots) over a duration — useful for seeing animation, loading, or motion over a window. | `duration?`, `fps?`, `maxFrames?`, `quality?` |
+| `browser_gif` | Capture a timed sequence of frames (screenshots) over a duration. | `duration?`, `fps?`, `maxFrames?`, `quality?` |
 | `browser_batch` | Run several browser_* tool calls in one request, in order, stopping at the first failure. | `steps` |

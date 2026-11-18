@@ -498,7 +498,7 @@ export const BROWSER_TOOLS: BrowserTool[] = [
     name: "browser_observe",
     action: "observe",
     description:
-      "Start or stop a DOM/navigation observer on the current page. When started, the extension will send events when the page changes. Useful for monitoring dynamic content.",
+      "Start or stop a DOM and navigation observer on the current page. No transport delivers the observer's events to the caller yet, so this tool cannot report page changes. To wait for a change, use browser_wait.",
     schema: {
       action: z
         .enum(["start", "stop"])
@@ -847,7 +847,7 @@ export const BROWSER_TOOLS: BrowserTool[] = [
     name: "browser_gif",
     action: "gif",
     description:
-      "Capture a timed sequence of frames (screenshots) over a duration — useful for seeing animation, loading, or motion over a window. Returns an ordered set of JPEG frames. Note: returns a frame sequence, not an encoded .gif file (the browser↔host channel caps a single artifact at ~1MB); frames stop once the response nears that limit.",
+      "Capture a timed sequence of frames (screenshots) over a duration. Use it to see animation, loading, or motion over a window. Returns an ordered set of JPEG frames. Note: returns a frame sequence, not an encoded .gif file (the browser↔host channel caps a single artifact at ~1MB); frames stop once the response nears that limit.",
     schema: {
       duration: z
         .number()
