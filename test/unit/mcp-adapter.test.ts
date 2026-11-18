@@ -220,7 +220,7 @@ describe("MCP adapter HTTP transport access control", () => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "chh-mcp-http-"));
     const tokenFile = path.join(dir, "bridge.token");
     fs.writeFileSync(tokenFile, token + "\n", { mode: 0o600 });
-    httpServer = await __startHttp(new McpServer({ name: "t", version: "0" }), 0, tokenFile);
+    httpServer = await __startHttp(() => new McpServer({ name: "t", version: "0" }), 0, tokenFile);
     const addr = httpServer.address();
     assert.ok(addr && typeof addr === "object");
     base = `http://127.0.0.1:${addr.port}/`;
@@ -251,5 +251,12 @@ describe("MCP adapter HTTP transport access control", () => {
     const res = await post({ Authorization: `Bearer ${token}` });
     assert.equal(res.status, 200);
     await res.text();
+  });
+  it("serves every request, not just the first", async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = await post({ Authorization: `Bearer ${token}` });
+      assert.equal(res.status, 200, `request ${i + 1}`);
+      await res.text();
+    }
   });
 });
