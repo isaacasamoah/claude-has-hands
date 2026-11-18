@@ -13,7 +13,7 @@ A trailing `?` marks an optional parameter. `GET /v1/tools` or `chh tools` retur
 | `browser_dom_snapshot` | Inspect DOM elements on the current page with selectors, XPath, bounding boxes, visibility, attributes, text, and bounded outerHTML. | `selector?`, `text?`, `limit?`, `includeHidden?`, `maxHtmlLength?` |
 | `browser_click` | Click an element on the page. | `selector?`, `roleName?`, `index?` |
 | `browser_type` | Type text into an element. | `selector?`, `roleName?`, `index?`, `text`, `clear?` |
-| `browser_select_option` | Select an option in a native <select> element or ARIA combobox. | `selector?`, `roleName?`, `index?`, `value?`, `label?`, `optionIndex?` |
+| `browser_select_option` | Select an option in a native `<select>` element or ARIA combobox. | `selector?`, `roleName?`, `index?`, `value?`, `label?`, `optionIndex?` |
 | `browser_read` | Extract text content from the current page or a specific element. | `selector?`, `maxLength?` |
 | `browser_scroll` | Scroll the page or a specific scrollable element. | `direction`, `amount?`, `selector?` |
 | `browser_keypress` | Dispatch a keyboard event (keydown, keypress, keyup) to the page or a specific element. | `key`, `selector?`, `modifiers?` |
@@ -24,7 +24,7 @@ A trailing `?` marks an optional parameter. `GET /v1/tools` or `chh tools` retur
 | `browser_console` | Read buffered console output (log/info/warn/error/debug) plus uncaught errors and unhandled promise rejections from the current page. | `level?`, `limit?`, `clear?` |
 | `browser_network` | Read buffered network request metadata (method, URL, status, timing) for fetch() and XMLHttpRequest calls made by the current page. | `url?`, `method?`, `status?`, `limit?`, `clear?` |
 | `browser_eval` | Evaluate a JavaScript expression in the page's main world and return its value. | `expression`, `awaitPromise?` |
-| `browser_file_upload` | Attach local files to a file <input> on the page, targeted by CSS selector. | `selector`, `files` |
+| `browser_file_upload` | Attach local files to a file `<input>` on the page, targeted by CSS selector. | `selector`, `files` |
 | `browser_form_input` | Fill multiple form fields in one call, targeting each by CSS selector. | `fields` |
 | `browser_gif` | Capture a timed sequence of frames (screenshots) over a duration. | `duration?`, `fps?`, `maxFrames?`, `quality?` |
 | `browser_batch` | Run several browser_* tool calls in one request, in order, stopping at the first failure. | `steps` |
