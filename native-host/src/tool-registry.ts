@@ -608,7 +608,7 @@ export const BROWSER_TOOLS: BrowserTool[] = [
     name: "browser_wait",
     action: "wait",
     description:
-      "Wait for a condition: page navigation to complete, a CSS selector to appear, or a fixed timeout. Useful after clicking links or submitting forms.",
+      "Wait for a condition: page navigation to complete, a CSS selector to appear, or a fixed timeout. Useful after clicking links or submitting forms. Returns an error if the navigation or selector does not arrive before the timeout.",
     schema: {
       condition: z
         .enum(["navigation", "selector", "timeout"])
@@ -628,16 +628,8 @@ export const BROWSER_TOOLS: BrowserTool[] = [
         .describe("Maximum wait time in milliseconds, up to 25000. Default 10000."),
     },
     format: (result) => {
-      const r = result as {
-        waited: string;
-        elapsed: number;
-        found?: boolean;
-      };
-      let text = `Waited for ${r.waited} (${r.elapsed}ms)`;
-      if (r.found !== undefined) {
-        text += r.found ? " — element found" : " — element NOT found (timed out)";
-      }
-      return [{ type: "text", text }];
+      const r = result as { waited: string; elapsed: number };
+      return [{ type: "text", text: `Waited for ${r.waited} (${r.elapsed}ms)` }];
     },
   },
   {
