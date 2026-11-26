@@ -38,7 +38,6 @@ export interface GifResult {
   truncated: boolean;
 }
 
-/** Total base64 budget for the whole response — under MAX_MESSAGE_SIZE (950KB). */
 const MAX_TOTAL_BASE64 = 850_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

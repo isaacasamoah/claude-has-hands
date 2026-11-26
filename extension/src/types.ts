@@ -56,6 +56,3 @@ export interface TabEntry {
   title: string;
   lastActive: number;
 }
-
-/** 1MB native messaging limit — we check at 950KB to leave room for framing */
-export const MAX_MESSAGE_SIZE = 950_000;

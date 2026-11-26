@@ -13,7 +13,6 @@ import { EventEmitter } from "events";
 import type { CommandMessage, ResponseMessage } from "./types.js";
 import {
   MAX_MESSAGE_SIZE,
-  MessageTooLargeError,
   readLengthPrefixed,
   writeLengthPrefixed,
 } from "./wire-protocol.js";
@@ -144,21 +143,7 @@ export class BridgeClient extends EventEmitter {
   }
 
   private drain(): void {
-    let parsed;
-    try {
-      parsed = readLengthPrefixed(this.buffer, MAX_MESSAGE_SIZE);
-    } catch (e) {
-      if (e instanceof MessageTooLargeError) {
-        this.emit("error", e);
-        // Framing is no longer trustworthy — drop the whole buffer and
-        // tear down the socket. The caller will see disconnected.
-        this.buffer = Buffer.alloc(0);
-        if (this.socket) this.socket.destroy(e);
-        return;
-      }
-      throw e;
-    }
-
+    const parsed = readLengthPrefixed(this.buffer, MAX_MESSAGE_SIZE);
     this.buffer = parsed.remainder;
 
     for (const raw of parsed.messages) {
@@ -175,6 +160,11 @@ export class BridgeClient extends EventEmitter {
       } else {
         this.emit("event", msg);
       }
+    }
+
+    if (parsed.oversized) {
+      this.emit("error", parsed.oversized);
+      this.socket?.destroy(parsed.oversized);
     }
   }
 

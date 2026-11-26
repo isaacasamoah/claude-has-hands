@@ -10,6 +10,7 @@
 
 import { setupKeepalive, startPingLoop } from "./lib/keepalive.js";
 import { runExclusive } from "./lib/mutex.js";
+import { fitResponse } from "./lib/response-size.js";
 import {
   handleNavigate,
   handleBack,
@@ -34,7 +35,6 @@ import { handleFileUpload } from "./commands/file-upload.js";
 import { handleFormInput } from "./commands/form-input.js";
 import { handleGif } from "./commands/gif.js";
 import type { CommandMessage, ResponseMessage, EventMessage, TabEntry } from "./types.js";
-import { MAX_MESSAGE_SIZE } from "./types.js";
 
 const HOST_NAME = "com.claude.has_hands";
 const LOG_PREFIX = "[CHH]";
@@ -192,17 +192,7 @@ function sendResponse(response: ResponseMessage): void {
     return;
   }
 
-  const serialized = JSON.stringify(response);
-  if (serialized.length > MAX_MESSAGE_SIZE) {
-    port.postMessage({
-      id: response.id,
-      success: false,
-      error: `Response too large (${serialized.length} bytes). Native messaging limit is 1MB.`,
-    });
-    return;
-  }
-
-  port.postMessage(response);
+  port.postMessage(fitResponse(response));
 }
 
 // ── Status ────────────────────────────────────────────────────────
