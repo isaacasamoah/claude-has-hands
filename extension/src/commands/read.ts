@@ -5,6 +5,7 @@
  */
 
 import type { NavigationState } from "./navigate.js";
+import { unwrapPageResult, type PageResult } from "../lib/page-result.js";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -29,18 +30,22 @@ export async function handleRead(
 
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (sel: string | null) => {
-      if (sel) {
-        const el = document.querySelector(sel);
-        if (!el) throw new Error(`Element not found: ${sel}`);
-        return (el as HTMLElement).innerText || "";
+    func: (sel: string | null): PageResult<string> => {
+      try {
+        if (sel) {
+          const el = document.querySelector(sel);
+          if (!el) return { ok: false, error: `Element not found: ${sel}` };
+          return { ok: true, value: (el as HTMLElement).innerText || "" };
+        }
+        return { ok: true, value: document.body.innerText || "" };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }
-      return document.body.innerText || "";
     },
     args: [selector ?? null],
   });
 
-  let text = (results?.[0]?.result as string) ?? "";
+  let text = unwrapPageResult(results);
   let truncated = false;
 
   if (text.length > maxLength) {

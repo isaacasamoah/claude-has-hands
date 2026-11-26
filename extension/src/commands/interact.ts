@@ -9,6 +9,7 @@
  */
 
 import { withCDP } from "../lib/cdp.js";
+import { unwrapPageResult, type PageResult } from "../lib/page-result.js";
 import {
   getSurveyCache,
   buildParentMap,
@@ -94,66 +95,63 @@ async function clickBySelector(
 ): Promise<ClickResult> {
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (sel: string) => {
-      const el = document.querySelector(sel) as HTMLElement;
-      if (!el) throw new Error(`Element not found: ${sel}`);
-      el.click();
-      const tag = el.tagName.toLowerCase();
-      const text = el.textContent?.trim().slice(0, 50) || "";
-      const desc = text ? `<${tag}> "${text}"` : `<${tag}>`;
+    func: (sel: string): PageResult<{ description: string; hint: string | null }> => {
+      try {
+        const el = document.querySelector(sel) as HTMLElement | null;
+        if (!el) return { ok: false, error: `Element not found: ${sel}` };
+        el.click();
+        const tag = el.tagName.toLowerCase();
+        const text = el.textContent?.trim().slice(0, 50) || "";
+        const desc = text ? `<${tag}> "${text}"` : `<${tag}>`;
 
-      // Inline diagnostic — same logic as diagnoseClick() but in page world.
-      const parent = el.parentElement;
-      const parentTag = parent ? parent.tagName : null;
-      const parentSelect = parent && parent.tagName === "SELECT"
-        ? (parent as HTMLSelectElement)
-        : null;
+        const parent = el.parentElement;
+        const parentTag = parent ? parent.tagName : null;
+        const parentSelect = parent && parent.tagName === "SELECT"
+          ? (parent as HTMLSelectElement)
+          : null;
 
-      let hint: string | null = null;
-      if (
-        el.tagName === "OPTION" &&
-        parentSelect &&
-        !parentSelect.multiple &&
-        (parentSelect.size || 1) <= 1
-      ) {
-        hint =
-          "Clicked an <option> inside a closed <select>. The select's value did NOT change " +
-          "because native <select> popups are OS-rendered, not DOM-rendered. " +
-          "Use browser_select_option to actually change the value.";
-      } else if (el.tagName === "LABEL") {
-        const labelEl = el as HTMLLabelElement;
-        if (labelEl.htmlFor) {
-          const ref = document.getElementById(labelEl.htmlFor) as
-            | (HTMLElement & { disabled?: boolean })
-            | null;
-          if (ref && ref.disabled) {
-            hint =
-              "Clicked a <label> whose for-target element is disabled. The associated " +
-              "control will not receive focus or activation.";
+        let hint: string | null = null;
+        if (
+          el.tagName === "OPTION" &&
+          parentSelect &&
+          !parentSelect.multiple &&
+          (parentSelect.size || 1) <= 1
+        ) {
+          hint =
+            "Clicked an <option> inside a closed <select>. The select's value did NOT change " +
+            "because native <select> popups are OS-rendered, not DOM-rendered. " +
+            "Use browser_select_option to actually change the value.";
+        } else if (el.tagName === "LABEL") {
+          const labelEl = el as HTMLLabelElement;
+          if (labelEl.htmlFor) {
+            const ref = document.getElementById(labelEl.htmlFor) as
+              | (HTMLElement & { disabled?: boolean })
+              | null;
+            if (ref && ref.disabled) {
+              hint =
+                "Clicked a <label> whose for-target element is disabled. The associated " +
+                "control will not receive focus or activation.";
+            }
           }
+        } else if (
+          el.tagName === "SUMMARY" &&
+          parentTag !== null &&
+          parentTag !== "DETAILS"
+        ) {
+          hint =
+            "Clicked a <summary> that is not inside a <details>. The expected toggle " +
+            "behaviour does not apply.";
         }
-      } else if (
-        el.tagName === "SUMMARY" &&
-        parentTag !== null &&
-        parentTag !== "DETAILS"
-      ) {
-        hint =
-          "Clicked a <summary> that is not inside a <details>. The expected toggle " +
-          "behaviour does not apply.";
-      }
 
-      return { description: desc, hint };
+        return { ok: true, value: { description: desc, hint } };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
     },
     args: [selector],
   });
 
-  const out = results?.[0]?.result as
-    | { description: string; hint: string | null }
-    | undefined;
-  if (!out) {
-    throw new Error(`Click failed: no result from executeScript`);
-  }
-
+  const out = unwrapPageResult(results);
   const result: ClickResult = { clicked: selector, description: out.description };
   if (out.hint) result.hint = out.hint;
   return result;
@@ -167,33 +165,31 @@ async function typeBySelector(
 ): Promise<TypeResult> {
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (sel: string, txt: string, clr: boolean) => {
-      const el = document.querySelector(sel) as HTMLElement;
-      if (!el) throw new Error(`Element not found: ${sel}`);
-      el.focus();
-      if (clr) {
-        if ("select" in el && typeof (el as HTMLInputElement).select === "function") {
-          (el as HTMLInputElement).select();
-        } else {
-          // For contentEditable or other elements
-          document.execCommand("selectAll");
+    func: (sel: string, txt: string, clr: boolean): PageResult<string> => {
+      try {
+        const el = document.querySelector(sel) as HTMLElement | null;
+        if (!el) return { ok: false, error: `Element not found: ${sel}` };
+        el.focus();
+        if (clr) {
+          if ("select" in el && typeof (el as HTMLInputElement).select === "function") {
+            (el as HTMLInputElement).select();
+          } else {
+            document.execCommand("selectAll");
+          }
         }
+        document.execCommand("insertText", false, txt);
+        const tag = el.tagName.toLowerCase();
+        const role = el.getAttribute("role") || "";
+        const desc = role ? `<${tag} role="${role}">` : `<${tag}>`;
+        return { ok: true, value: desc };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
       }
-      document.execCommand("insertText", false, txt);
-      const tag = el.tagName.toLowerCase();
-      const role = el.getAttribute("role") || "";
-      const desc = role ? `<${tag} role="${role}">` : `<${tag}>`;
-      return desc;
     },
     args: [selector, text, clear],
   });
 
-  const target = results?.[0]?.result as string;
-  if (!target) {
-    throw new Error(`Type failed: no result from executeScript`);
-  }
-
-  return { typed: text, target };
+  return { typed: text, target: unwrapPageResult(results) };
 }
 
 // ── CDP Element Resolution ──────────────────────────────────────
