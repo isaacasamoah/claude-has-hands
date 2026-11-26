@@ -12,6 +12,9 @@
 #   chh call <tool> ['<input-json>']                    # POST /v1/call
 #   chh <tool> ['<input-json>']                         # shorthand for `call`
 #
+# Exit status: 0 when the bridge answers {"ok":true,...}, 1 otherwise.
+# The response body prints in both cases.
+#
 # When this script is symlinked to a name that starts with `browser_`,
 # it dispatches that tool directly: `browser_navigate '{"url":"..."}'`.
 #
@@ -63,20 +66,26 @@ require_command() {
 require_command curl
 require_command python3
 
+print_checked() {
+  local response="$1"
+  printf '%s\n' "$response"
+  printf '%s' "$response" \
+    | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ok") is True else 1)' 2>/dev/null \
+    || exit 1
+}
+
 cmd_tools() {
   local url token
   url="$(resolve_url)"
   token="$(read_token)"
-  curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/tools"
-  printf '\n'
+  print_checked "$(curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/tools")"
 }
 
 cmd_status() {
   local url token
   url="$(resolve_url)"
   token="$(read_token)"
-  curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/status"
-  printf '\n'
+  print_checked "$(curl -sS -H "Authorization: Bearer ${token}" "${url}/v1/status")"
 }
 
 cmd_call() {
@@ -102,12 +111,11 @@ input_json = sys.argv[2]
 print(json.dumps({"tool": tool, "input": json.loads(input_json)}))
 ' "$tool" "$input")"
 
-  curl -sS \
+  print_checked "$(curl -sS \
     -H "Authorization: Bearer ${token}" \
     -H "Content-Type: application/json" \
     -d "$body" \
-    "${url}/v1/call"
-  printf '\n'
+    "${url}/v1/call")"
 }
 
 usage() {
