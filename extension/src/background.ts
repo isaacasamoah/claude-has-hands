@@ -45,6 +45,8 @@ let port: chrome.runtime.Port | null = null;
 let reconnectDelay = 1000;
 const MAX_RECONNECT_DELAY = 30_000;
 
+const COMMAND_DEADLINE_MS = 28_000;
+
 // ── Tab Registry ──────────────────────────────────────────────────
 
 let automationTabId: number | null = null;
@@ -176,7 +178,7 @@ async function handleCommand(msg: CommandMessage): Promise<void> {
   };
 
   try {
-    const result = await runExclusive(mutexKey(action, params), dispatch);
+    const result = await runExclusive(mutexKey(action, params), COMMAND_DEADLINE_MS, dispatch);
     sendResponse({ id, success: true, result });
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);

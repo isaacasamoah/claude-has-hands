@@ -95,11 +95,10 @@ export async function handleWait(
     }
 
     case "timeout": {
-      const waitTime = Math.min(timeout, 30000); // Cap at 30s
-      await new Promise((r) => setTimeout(r, waitTime));
+      await new Promise((r) => setTimeout(r, timeout));
 
       return {
-        waited: `timeout: ${waitTime}ms`,
+        waited: `timeout: ${timeout}ms`,
         elapsed: Date.now() - start,
       };
     }

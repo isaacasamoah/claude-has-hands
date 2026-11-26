@@ -10,6 +10,8 @@ import {
   __resetMutexes,
 } from "../../extension/src/lib/mutex.ts";
 
+const DEADLINE = 1_000;
+
 function defer<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: unknown) => void } {
   let resolve!: (v: T) => void;
   let reject!: (e: unknown) => void;
@@ -27,12 +29,12 @@ describe("runExclusive", () => {
     const a = defer<void>();
     const b = defer<void>();
 
-    const taskA = runExclusive("k", async () => {
+    const taskA = runExclusive("k", DEADLINE, async () => {
       order.push("A:start");
       await a.promise;
       order.push("A:end");
     });
-    const taskB = runExclusive("k", async () => {
+    const taskB = runExclusive("k", DEADLINE, async () => {
       order.push("B:start");
       await b.promise;
       order.push("B:end");
@@ -60,12 +62,12 @@ describe("runExclusive", () => {
     const a = defer<void>();
     const b = defer<void>();
 
-    const taskA = runExclusive("ka", async () => {
+    const taskA = runExclusive("ka", DEADLINE, async () => {
       order.push("A:start");
       await a.promise;
       order.push("A:end");
     });
-    const taskB = runExclusive("kb", async () => {
+    const taskB = runExclusive("kb", DEADLINE, async () => {
       order.push("B:start");
       await b.promise;
       order.push("B:end");
@@ -82,19 +84,44 @@ describe("runExclusive", () => {
 
   it("does not poison the chain when a prior task throws", async () => {
     __resetMutexes();
-    const failed = runExclusive("k", async () => {
+    const failed = runExclusive("k", DEADLINE, async () => {
       throw new Error("boom");
     });
 
     await assert.rejects(failed, /boom/);
 
-    const ok = await runExclusive("k", async () => "ok");
+    const ok = await runExclusive("k", DEADLINE, async () => "ok");
     assert.equal(ok, "ok");
   });
 
   it("preserves the return value of the task", async () => {
     __resetMutexes();
-    const v = await runExclusive("k", async () => 42);
+    const v = await runExclusive("k", DEADLINE, async () => 42);
     assert.equal(v, 42);
+  });
+
+  it("rejects a task that outlives its deadline and frees the key", async () => {
+    __resetMutexes();
+    const hung = runExclusive("k", 30, () => new Promise<never>(() => {}));
+    await assert.rejects(hung, /did not finish within 30ms/);
+
+    const next = await runExclusive("k", 30, async () => "next");
+    assert.equal(next, "next");
+  });
+
+  it("does not start a task whose deadline passed while it waited", async () => {
+    __resetMutexes();
+    const slow = defer<void>();
+    const first = runExclusive("k", DEADLINE, () => slow.promise);
+    let started = false;
+    const queued = runExclusive("k", 20, async () => {
+      started = true;
+    });
+
+    await new Promise((r) => setTimeout(r, 40));
+    slow.resolve();
+    await first;
+    await assert.rejects(queued, /did not start within 20ms/);
+    assert.equal(started, false);
   });
 });

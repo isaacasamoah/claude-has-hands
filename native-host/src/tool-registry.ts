@@ -621,9 +621,11 @@ export const BROWSER_TOOLS: BrowserTool[] = [
         ),
       timeout: z
         .number()
+        .min(0)
+        .max(25000)
         .optional()
         .default(10000)
-        .describe("Maximum wait time in milliseconds. Default 10000."),
+        .describe("Maximum wait time in milliseconds, up to 25000. Default 10000."),
     },
     format: (result) => {
       const r = result as {
@@ -757,7 +759,7 @@ export const BROWSER_TOOLS: BrowserTool[] = [
     name: "browser_eval",
     action: "eval",
     description:
-      "Evaluate a JavaScript expression in the page's main world and return its value. Has access to the page's own globals (window, document, app state). Promises are awaited. Use for reading computed state or driving behaviour that has no dedicated tool — prefer the structured tools (survey/click/type) when they fit.",
+      "Evaluate a JavaScript expression in the page's main world and return its value. Has access to the page's own globals (window, document, app state). Promises are awaited for up to 20 seconds. Use for reading computed state or driving behaviour that has no dedicated tool — prefer the structured tools (survey/click/type) when they fit.",
     schema: {
       expression: z
         .string()
