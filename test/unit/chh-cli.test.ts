@@ -38,6 +38,12 @@ before(async () => {
             success: true,
             result: { title: "Echoed", url: cmd.params.url, tabId: 1 },
           });
+        } else if (cmd.action === "click") {
+          dispatcher.handleResponse({
+            id: cmd.id,
+            success: false,
+            error: `Element not found: ${cmd.params.selector}`,
+          });
         } else if (cmd.action === "status") {
           dispatcher.handleResponse({
             id: cmd.id,
@@ -122,6 +128,19 @@ describe("chh CLI — round-trip via REST", () => {
     const body = JSON.parse(out);
     assert.equal(body.ok, true);
     assert.equal(body.result.url, "https://example.org");
+  });
+
+  it("exits non-zero and still prints the body when the tool fails", async () => {
+    await assert.rejects(
+      runChh(["call", "browser_click", '{"selector":"#nope"}']),
+      (err: { code: number; stdout: string }) => {
+        assert.equal(err.code, 1);
+        const body = JSON.parse(err.stdout);
+        assert.equal(body.ok, false);
+        assert.equal(body.error.message, "Element not found: #nope");
+        return true;
+      }
+    );
   });
 
   it("rejects malformed JSON input before contacting the bridge", async () => {

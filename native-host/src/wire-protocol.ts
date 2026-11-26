@@ -31,16 +31,14 @@ export class MessageTooLargeError extends Error {
  * Drain length-prefixed messages from a buffer.
  *
  * Returns the messages decoded so far and the unconsumed tail (a fresh
- * Buffer that the caller stores until more bytes arrive). If the declared
- * length of the *next* frame exceeds `maxBytes`, throws MessageTooLargeError
- * before allocating — the caller should close the connection.
+ * Buffer that the caller stores until more bytes arrive).
  *
  * Pure: no I/O, no side effects on the input buffer.
  */
 export function readLengthPrefixed(
   buffer: Buffer,
   maxBytes: number = MAX_MESSAGE_SIZE
-): { messages: unknown[]; remainder: Buffer } {
+): { messages: unknown[]; remainder: Buffer; oversized?: MessageTooLargeError } {
   const messages: unknown[] = [];
   let offset = 0;
 
@@ -48,7 +46,11 @@ export function readLengthPrefixed(
     const msgLen = buffer.readUInt32LE(offset);
 
     if (msgLen > maxBytes) {
-      throw new MessageTooLargeError(msgLen, maxBytes);
+      return {
+        messages,
+        remainder: buffer.subarray(offset),
+        oversized: new MessageTooLargeError(msgLen, maxBytes),
+      };
     }
 
     if (offset + 4 + msgLen > buffer.length) {

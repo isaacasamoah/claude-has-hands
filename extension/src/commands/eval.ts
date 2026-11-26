@@ -25,6 +25,8 @@ export interface EvalResult {
 
 const MAX_VALUE_CHARS = 50_000;
 
+const EVAL_TIMEOUT_MS = 20_000;
+
 export async function handleEval(
   params: Record<string, unknown>,
   state: NavigationState
@@ -42,7 +44,14 @@ export async function handleEval(
   const tabId = state.automationTabId;
 
   return withCDP(tabId, async (tid) => {
-    const res = (await chrome.debugger.sendCommand({ tabId: tid }, "Runtime.evaluate", {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`Evaluation did not finish within ${EVAL_TIMEOUT_MS}ms.`)),
+        EVAL_TIMEOUT_MS
+      );
+    });
+    const evaluation = chrome.debugger.sendCommand({ tabId: tid }, "Runtime.evaluate", {
       expression,
       returnByValue: true,
       awaitPromise,
@@ -50,7 +59,8 @@ export async function handleEval(
       // A bare object literal `{...}` is parsed as a block without this; it
       // matches DevTools console behaviour and is generally what callers expect.
       replMode: true,
-    })) as {
+    });
+    const res = (await Promise.race([evaluation, timedOut]).finally(() => clearTimeout(timer))) as {
       result?: { type: string; value?: unknown; description?: string };
       exceptionDetails?: {
         text?: string;

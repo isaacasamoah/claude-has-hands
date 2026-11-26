@@ -12,7 +12,6 @@ import type { NavigationState } from "./navigate.js";
 export interface WaitResult {
   waited: string;
   elapsed: number;
-  found?: boolean;
 }
 
 // ── Handler ─────────────────────────────────────────────────────
@@ -70,7 +69,6 @@ export async function handleWait(
       }
 
       const pollInterval = 200;
-      let found = false;
 
       while (Date.now() - start < timeout) {
         const results = await chrome.scripting.executeScript({
@@ -80,26 +78,23 @@ export async function handleWait(
         });
 
         if (results?.[0]?.result) {
-          found = true;
-          break;
+          return {
+            waited: `selector: ${selector}`,
+            elapsed: Date.now() - start,
+          };
         }
 
         await new Promise((r) => setTimeout(r, pollInterval));
       }
 
-      return {
-        waited: `selector: ${selector}`,
-        elapsed: Date.now() - start,
-        found,
-      };
+      throw new Error(`Selector wait timed out after ${timeout}ms: ${selector}`);
     }
 
     case "timeout": {
-      const waitTime = Math.min(timeout, 30000); // Cap at 30s
-      await new Promise((r) => setTimeout(r, waitTime));
+      await new Promise((r) => setTimeout(r, timeout));
 
       return {
-        waited: `timeout: ${waitTime}ms`,
+        waited: `timeout: ${timeout}ms`,
         elapsed: Date.now() - start,
       };
     }

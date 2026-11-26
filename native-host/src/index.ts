@@ -218,18 +218,7 @@ const socketServer = net.createServer((socket) => {
   socket.on("data", (chunk: Buffer) => {
     state.buffer = Buffer.concat([state.buffer, chunk]);
 
-    let parsed;
-    try {
-      parsed = readLengthPrefixed(state.buffer, MAX_MESSAGE_SIZE);
-    } catch (e) {
-      if (e instanceof MessageTooLargeError) {
-        log(`Closing socket: ${e.message}`);
-        socket.destroy(e);
-        return;
-      }
-      throw e;
-    }
-
+    const parsed = readLengthPrefixed(state.buffer, MAX_MESSAGE_SIZE);
     state.buffer = parsed.remainder;
 
     for (const raw of parsed.messages) {
@@ -270,6 +259,11 @@ const socketServer = net.createServer((socket) => {
 
       pendingRequests.set(cmd.id, socket);
       nativeWriter.write(cmd);
+    }
+
+    if (parsed.oversized) {
+      log(`Closing socket: ${parsed.oversized.message}`);
+      socket.destroy(parsed.oversized);
     }
   });
 

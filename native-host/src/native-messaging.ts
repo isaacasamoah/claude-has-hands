@@ -4,22 +4,18 @@
  * Wire format:
  * - 4 bytes: uint32 LE message length
  * - N bytes: UTF-8 JSON payload
- *
- * Max message size: 1MB (Chrome hard limit). Enforced via the shared
- * readLengthPrefixed helper in wire-protocol.ts so the same cap applies
- * to every parser in this codebase.
  */
 
 import { EventEmitter } from "events";
 import {
   MAX_MESSAGE_SIZE,
-  MessageTooLargeError,
   readLengthPrefixed,
   writeLengthPrefixed,
-} from "./wire-protocol.js";
+} from "./wire-protocol.ts";
 
 export class NativeMessagingReader extends EventEmitter {
   private buffer: Buffer = Buffer.alloc(0);
+  private oversizedBytesLeft = 0;
   private stream: NodeJS.ReadableStream;
 
   constructor(stream: NodeJS.ReadableStream) {
@@ -41,29 +37,28 @@ export class NativeMessagingReader extends EventEmitter {
   }
 
   private drain(): void {
-    let parsed;
-    try {
-      parsed = readLengthPrefixed(this.buffer, MAX_MESSAGE_SIZE);
-    } catch (e) {
-      if (e instanceof MessageTooLargeError) {
-        this.emit("error", e);
-        // Drop the buffer — we can no longer trust framing.
-        this.buffer = Buffer.alloc(0);
-        return;
-      }
-      throw e;
-    }
+    for (;;) {
+      const skipped = Math.min(this.oversizedBytesLeft, this.buffer.length);
+      this.buffer = this.buffer.subarray(skipped);
+      this.oversizedBytesLeft -= skipped;
+      if (this.oversizedBytesLeft > 0) return;
 
-    this.buffer = parsed.remainder;
-    for (const msg of parsed.messages) {
-      if (msg && typeof msg === "object" && "__parseError" in msg) {
-        this.emit(
-          "error",
-          new Error(`Invalid JSON in native message: ${(msg as { __parseError: string }).__parseError}`)
-        );
-        continue;
+      const parsed = readLengthPrefixed(this.buffer, MAX_MESSAGE_SIZE);
+      this.buffer = parsed.remainder;
+      for (const msg of parsed.messages) {
+        if (msg && typeof msg === "object" && "__parseError" in msg) {
+          this.emit(
+            "error",
+            new Error(`Invalid JSON in native message: ${(msg as { __parseError: string }).__parseError}`)
+          );
+          continue;
+        }
+        this.emit("message", msg);
       }
-      this.emit("message", msg);
+
+      if (!parsed.oversized) return;
+      this.emit("error", parsed.oversized);
+      this.oversizedBytesLeft = 4 + parsed.oversized.declaredLength;
     }
   }
 }

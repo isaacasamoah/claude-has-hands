@@ -7,12 +7,14 @@
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
 import {
   readLengthPrefixed,
   writeLengthPrefixed,
   MessageTooLargeError,
   MAX_MESSAGE_SIZE,
 } from "../../native-host/src/wire-protocol.ts";
+import { NativeMessagingReader } from "../../native-host/src/native-messaging.ts";
 
 function frame(obj: unknown): Buffer {
   const { header, payload } = writeLengthPrefixed(obj);
@@ -44,27 +46,30 @@ describe("readLengthPrefixed", () => {
     assert.equal(remainder.length, b.length - 3);
   });
 
-  it("throws MessageTooLargeError when the declared length exceeds the cap", () => {
+  it("reports a frame whose declared length exceeds the cap", () => {
     // Hand-craft a header claiming 4 GiB.
     const header = Buffer.alloc(4);
     header.writeUInt32LE(0xffffffff, 0);
-    assert.throws(
-      () => readLengthPrefixed(header),
-      (err: unknown) => {
-        assert.ok(err instanceof MessageTooLargeError);
-        assert.equal((err as MessageTooLargeError).declaredLength, 0xffffffff);
-        assert.equal((err as MessageTooLargeError).cap, MAX_MESSAGE_SIZE);
-        return true;
-      }
-    );
+    const { messages, remainder, oversized } = readLengthPrefixed(header);
+    assert.deepEqual(messages, []);
+    assert.ok(oversized instanceof MessageTooLargeError);
+    assert.equal(oversized.declaredLength, 0xffffffff);
+    assert.equal(oversized.cap, MAX_MESSAGE_SIZE);
+    assert.equal(remainder.length, 4, "remainder starts at the oversized frame's header");
   });
 
-  it("throws even with a custom (smaller) cap", () => {
-    const buf = frame({ payload: "x".repeat(100) });
-    assert.throws(
-      () => readLengthPrefixed(buf, 50),
-      (err: unknown) => err instanceof MessageTooLargeError
-    );
+  it("keeps the messages before an oversized frame", () => {
+    const buf = Buffer.concat([frame({ a: 1 }), frame({ payload: "x".repeat(100) })]);
+    const { messages, oversized } = readLengthPrefixed(buf, 50);
+    assert.deepEqual(messages, [{ a: 1 }]);
+    assert.ok(oversized instanceof MessageTooLargeError);
+  });
+
+  it("decodes a multibyte payload framed by its UTF-8 byte length", () => {
+    const msg = { text: "café ✓ 😀" };
+    const buf = frame(msg);
+    assert.equal(buf.readUInt32LE(0), Buffer.byteLength(JSON.stringify(msg), "utf-8"));
+    assert.deepEqual(readLengthPrefixed(buf).messages, [msg]);
   });
 
   it("returns __parseError marker for malformed JSON inside a valid frame", () => {
@@ -100,5 +105,34 @@ describe("writeLengthPrefixed", () => {
       () => writeLengthPrefixed({ big }),
       (err: unknown) => err instanceof MessageTooLargeError
     );
+  });
+});
+
+describe("NativeMessagingReader", () => {
+  it("skips exactly the oversized frame and keeps reading the next one", async () => {
+    const stream = new PassThrough();
+    const reader = new NativeMessagingReader(stream);
+    const messages: unknown[] = [];
+    const errors: Error[] = [];
+    reader.on("message", (m) => messages.push(m));
+    reader.on("error", (e: Error) => errors.push(e));
+
+    const fitsInCodeUnitsNotBytes = JSON.stringify({ text: "é".repeat(600_000) });
+    const payload = Buffer.from(fitsInCodeUnitsNotBytes, "utf-8");
+    assert.ok(fitsInCodeUnitsNotBytes.length < MAX_MESSAGE_SIZE);
+    assert.ok(payload.length > MAX_MESSAGE_SIZE);
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(payload.length, 0);
+    const oversized = Buffer.concat([header, payload]);
+
+    stream.write(frame({ before: 1 }));
+    stream.write(oversized.subarray(0, 300_000));
+    stream.write(oversized.subarray(300_000, 900_000));
+    stream.write(Buffer.concat([oversized.subarray(900_000), frame({ after: 2 })]));
+    await new Promise<void>((r) => setImmediate(r));
+
+    assert.deepEqual(messages, [{ before: 1 }, { after: 2 }]);
+    assert.equal(errors.length, 1);
+    assert.ok(errors[0] instanceof MessageTooLargeError);
   });
 });

@@ -8,6 +8,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { z } from "zod";
 import {
   BROWSER_TOOLS,
   getToolByName,
@@ -76,4 +77,10 @@ test("listToolDescriptors emits JSON Schema for every tool", () => {
     assert.ok(d.name && d.action && d.description);
     assert.equal(typeof d.inputSchema, "object");
   }
+});
+
+test("browser_wait refuses a timeout the 30s host dispatcher would cut off", () => {
+  const schema = z.object(getToolByName("browser_wait")!.schema);
+  assert.equal(schema.safeParse({ condition: "timeout", timeout: 25_000 }).success, true);
+  assert.equal(schema.safeParse({ condition: "timeout", timeout: 30_000 }).success, false);
 });

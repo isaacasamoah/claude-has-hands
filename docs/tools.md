@@ -16,7 +16,7 @@ A trailing `?` marks an optional parameter. `GET /v1/tools` or `chh tools` retur
 | `browser_select_option` | Select an option in a native `<select>` element or ARIA combobox. | `selector?`, `roleName?`, `index?`, `value?`, `label?`, `optionIndex?` |
 | `browser_read` | Extract text content from the current page or a specific element. | `selector?`, `maxLength?` |
 | `browser_scroll` | Scroll the page or a specific scrollable element. | `direction`, `amount?`, `selector?` |
-| `browser_keypress` | Dispatch a keyboard event (keydown, keypress, keyup) to the page or a specific element. | `key`, `selector?`, `modifiers?` |
+| `browser_keypress` | Press a key as a real keyboard would, so the browser runs its default action (Enter submits a form). | `key`, `selector?`, `modifiers?` |
 | `browser_screenshot` | Capture a screenshot of the current page as a JPEG image. | `quality?` |
 | `browser_observe` | Start or stop a DOM and navigation observer on the current page. | `action`, `observeId`, `events?` |
 | `browser_tabs` | Manage browser tabs: list all tabs, switch to a tab, open a new tab, or close a tab. | `action`, `tabId?`, `url?` |
