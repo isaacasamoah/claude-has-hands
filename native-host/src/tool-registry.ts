@@ -446,18 +446,18 @@ export const BROWSER_TOOLS: BrowserTool[] = [
     name: "browser_keypress",
     action: "keypress",
     description:
-      "Dispatch a keyboard event (keydown, keypress, keyup) to the page or a specific element. Useful for Enter, Escape, Tab, arrow keys, or keyboard shortcuts.",
+      "Press a key as a real keyboard would, so the browser runs its default action (Enter submits a form). Focuses the element first when you give a selector. Useful for Enter, Escape, Tab, arrow keys, or keyboard shortcuts.",
     schema: {
       key: z
         .string()
         .describe(
-          'The key to press. Examples: "Enter", "Escape", "Tab", "ArrowDown", "a", "1".'
+          'The key to press: a single character ("a", "1", "/") or a key name ("Enter", "Escape", "Tab", "Backspace", "Delete", "ArrowDown", "Home", "End", "PageUp", "PageDown", "F1" to "F12").'
         ),
       selector: z
         .string()
         .optional()
         .describe(
-          "CSS selector of the element to target. Omit to target the currently focused element."
+          "CSS selector of the element to focus before the key press. Omit to press the key on the currently focused element."
         ),
       modifiers: z
         .array(z.string())

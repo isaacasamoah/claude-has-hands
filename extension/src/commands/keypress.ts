@@ -1,9 +1,10 @@
 /**
- * Keypress command — dispatch keyboard events to the page.
- *
- * Uses chrome.scripting.executeScript to fire keydown, keypress, keyup.
+ * Synthetic DOM KeyboardEvents are untrusted and get no default action, such
+ * as a form submit on Enter, so keys go through CDP Input.dispatchKeyEvent.
  */
 
+import { withCDP } from "../lib/cdp.js";
+import { keyPressEvents } from "../lib/keys.js";
 import type { NavigationState } from "./navigate.js";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -31,35 +32,36 @@ export async function handleKeypress(
     throw new Error("key parameter is required.");
   }
 
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: (k: string, sel: string | null, mods: string[]) => {
-      const target =
-        (sel ? document.querySelector(sel) : document.activeElement) ||
-        document.body;
+  const [keyDown, keyUp] = keyPressEvents(key, modifiers);
 
-      const opts: KeyboardEventInit = {
-        key: k,
-        code: k.length === 1 ? `Key${k.toUpperCase()}` : k,
-        bubbles: true,
-        cancelable: true,
-        ctrlKey: mods.includes("ctrl") || mods.includes("control"),
-        shiftKey: mods.includes("shift"),
-        altKey: mods.includes("alt"),
-        metaKey: mods.includes("meta") || mods.includes("command"),
-      };
-
-      target.dispatchEvent(new KeyboardEvent("keydown", opts));
-
-      // Only fire keypress for printable characters
-      if (k.length === 1) {
-        target.dispatchEvent(new KeyboardEvent("keypress", opts));
-      }
-
-      target.dispatchEvent(new KeyboardEvent("keyup", opts));
-    },
-    args: [key, selector ?? null, modifiers],
+  await withCDP(tabId, async (tid) => {
+    if (selector) await focusSelector(tid, selector);
+    await chrome.debugger.sendCommand({ tabId: tid }, "Input.dispatchKeyEvent", keyDown);
+    await chrome.debugger.sendCommand({ tabId: tid }, "Input.dispatchKeyEvent", keyUp);
   });
 
   return { key };
+}
+
+async function focusSelector(tabId: number, selector: string): Promise<void> {
+  const res = (await chrome.debugger.sendCommand({ tabId }, "Runtime.evaluate", {
+    expression: `(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return false;
+      el.focus();
+      return true;
+    })()`,
+    returnByValue: true,
+  })) as {
+    result?: { value?: unknown };
+    exceptionDetails?: { exception?: { description?: string }; text?: string };
+  };
+
+  if (res.exceptionDetails) {
+    const ex = res.exceptionDetails;
+    throw new Error(ex.exception?.description || ex.text || `Invalid selector: ${selector}`);
+  }
+  if (res.result?.value !== true) {
+    throw new Error(`Element not found: ${selector}`);
+  }
 }
